@@ -99,7 +99,7 @@ def undersample_dataset(data,
     data_observations = data.shape[0]  # total number of observations
     data_dimensions = data.shape[1]  # total number of dimensions
     
-    if scatterplot_matrix is 'auto':
+    if scatterplot_matrix == 'auto':
         if data_dimensions > 10:
             scatterplot_matrix = False
         else:
@@ -118,7 +118,7 @@ def undersample_dataset(data,
     #--------------------------------------------------------------data scaling
     
     # min-max normalization per feature
-    if data_scaling is 'minmax':
+    if data_scaling == 'minmax':
         data_min = np.min(data, axis=0)
         data_max = np.max(data, axis=0)
         data = (data - data_min) / (data_max - data_min)
@@ -127,13 +127,13 @@ def undersample_dataset(data,
 
     x = np.arange(1,bins+1) - 0.5
     
-    if target_distribution is 'uniform':
+    if target_distribution == 'uniform':
         target_pdf = stats.uniform.pdf(x, loc=0, scale=bins)
-    elif target_distribution is 'gaussian':
+    elif target_distribution == 'gaussian':
         target_pdf = stats.norm.pdf(x, loc=bins/2, scale=1)
-    elif target_distribution is 'weibull':
+    elif target_distribution == 'weibull':
         target_pdf = stats.weibull_min.pdf(x, c=5, loc=2, scale=1)
-    elif target_distribution is 'triangular':
+    elif target_distribution == 'triangular':
         target_pdf = stats.triang.pdf(x, c=0.75, loc=0, scale=bins)
 
     #------------------------------------------------ quantizing data into bins
@@ -149,15 +149,15 @@ def undersample_dataset(data,
     
     #------------------------------------- displaying the initial distributions
     
-    
-    plot_scatter_matrix(data,
-                        column_names=None,
-                        show_correlation=True,
-                        alpha=None,
-                        title=('Original dataset (' + 
-                               str(data_observations) + 
-                               ' datapoints)')
-                        )
+    if scatterplot_matrix is True:
+        plot_scatter_matrix(data,
+                            column_names=None,
+                            show_correlation=True,
+                            alpha=None,
+                            title=('Original dataset (' +
+                                   str(data_observations) +
+                                   ' datapoints)')
+                            )
   
     #-------------------------------------------------------- MILP optimization
 
@@ -302,24 +302,23 @@ def undersample_dataset(data,
     if indx_selected.sum()>0:
         
         if scatterplot_matrix is True:
-            
-            
+
             plot_scatter_matrix(data[indx_selected,:],
                                 column_names=None,
                                 show_correlation=True,
                                 alpha=None,
-                                title=('Undersampled dataset (' + 
-                                       str(indx_selected.sum()) + 
+                                title=('Undersampled dataset (' +
+                                       str(indx_selected.sum()) +
                                        ' datapoints) - ' +
                                        target_distribution)
                                 )
-                               
+
             plot_scatter_matrix(data_quantized[indx_selected,:],
                                 column_names=None,
                                 show_correlation=True,
                                 alpha=None,
-                                title=('Undersampled dataset quantized (' + 
-                                       str(indx_selected.sum()) + 
+                                title=('Undersampled dataset quantized (' +
+                                       str(indx_selected.sum()) +
                                        ' datapoints) - ' +
                                        target_distribution)
                                 )
@@ -385,14 +384,14 @@ def plot_scatter_matrix(data,
         
     # create a dataframe and plot the basic scatterplot matrix
     df_A = pd.DataFrame(data, columns=column_names)
-    axes = pd.plotting.scatter_matrix(df_A, 
-                                      alpha=alpha, 
-                                      figsize=(8, 8), 
+    axes = pd.plotting.scatter_matrix(df_A,
+                                      alpha=alpha,
+                                      figsize=(8, 8),
                                       diagonal='hist')
     
     # plot Pearson correlation coefficient for pairs of dimensions
     if show_correlation is True:
-        corr = df_A.corr().as_matrix()
+        corr = df_A.corr().to_numpy()
         for i, j in zip(*plt.np.triu_indices_from(axes, k=1)):
             axes[i, j].annotate("r=%.3f" %corr[i,j], 
                 (0.7, 0.9), 

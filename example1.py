@@ -10,37 +10,25 @@ is called, in order to create a balanced subset across all 6 dimensions.
 Different tarket distributions can be achieved by using the correct input
 string.
 """
-
-import scipy.io
-import matplotlib.pyplot as plt
+import pandas as pd
 from distributional_undersampling import undersample_dataset
 
 
+if __name__ == '__main__':
+    input_csv = "test.csv"
+    columns_to_undersample = ["test_col1", "test_col2", "test_col3"]
+    output_csv = "test_undersampled.csv"
 
+    df = pd.read_csv(input_csv)
+    data = df[columns_to_undersample].to_numpy()
 
-def main():
-
-    plt.close('all')
-    
-    # loading precomputed 6-dimensional data
-    data = scipy.io.loadmat('data/DATA_random_6D.mat')['A']
-  
     indices_to_keep = undersample_dataset(data=data,
-                                          data_to_keep=1000,
-                                          target_distribution='uniform',
+                                          data_to_keep=30,
+                                          target_distribution="uniform",
+                                          data_scaling="minmax",
                                           bins=10,
                                           lamda=0.5,
-                                          verbose=True,
-                                          scatterplot_matrix='auto')
-    
-    data_undersampled = data[indices_to_keep]
-    
-    print ('Original dataset size:', str(data.shape))
-    print ('Undersampled dataset size:', str(data_undersampled.shape))
-    
+                                          verbose=False,
+                                          scatterplot_matrix=False)
 
-
-
-if __name__ == '__main__':
-  main()
-
+    df.loc[indices_to_keep].to_csv(output_csv)
