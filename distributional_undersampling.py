@@ -254,6 +254,8 @@ def undersample_dataset(data,
     
     result_status_code = solver.Solve()  # solve problem
     print(f"Status code: {result_status_code}")
+    if result_status_code not in result_status:
+        exit(f"Unknown status: {result_status_code}")
     if verbose is True:
         print('Result status =', result_status[result_status_code])
         print('Total cost = ', solver.Objective().Value())
