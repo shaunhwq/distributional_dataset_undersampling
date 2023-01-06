@@ -14,10 +14,6 @@ import matplotlib.pyplot as plt
 from scipy.special import comb
 
 
-
-
-
-
 def undersample_dataset(data,
                         data_to_keep=1000,
                         data_scaling = 'minmax',
@@ -26,8 +22,7 @@ def undersample_dataset(data,
                         lamda=0.5,
                         verbose=True,
                         scatterplot_matrix='auto'):
-    
-    '''
+    """
     ---------------------------------------------------------------------------
     Function to undersample a dataset by imposing distributional and 
     correlational constraints across its dimenions. The function runs a mixed 
@@ -87,13 +82,12 @@ def undersample_dataset(data,
     Vonikakis, V., Subramanian, R., Arnfred, J., & Winkler, S. 
     A Probabilistic Approach to People-Centric Photo Selection and Sequencing. 
     IEEE Transactions in Multimedia, 11(19), pp.2609-2624, 2017.
-    
-    '''
+    """
     
     # TODO: make target distribution different adjustable across dimensions. 
     # TODO: Also, wildcard dimensions?
     
-    #------------------------------------------------------ internal parameters
+    # ------------------------------------------------------ internal parameters
     
     max_solver_time = 10000  # msec
     data_observations = data.shape[0]  # total number of observations
@@ -113,9 +107,8 @@ def undersample_dataset(data,
                      'unbounded']
     
     plt.style.use('ggplot')
-    
-    
-    #--------------------------------------------------------------data scaling
+
+    # --------------------------------------------------------------data scaling
     
     # min-max normalization per feature
     if data_scaling == 'minmax':
@@ -123,9 +116,9 @@ def undersample_dataset(data,
         data_max = np.max(data, axis=0)
         data = (data - data_min) / (data_max - data_min)
 
-    #--------------------------------------------- defining target distribution
+    # --------------------------------------------- defining target distribution
 
-    x = np.arange(1,bins+1) - 0.5
+    x = np.arange(1, bins+1) - 0.5
     
     if target_distribution == 'uniform':
         target_pdf = stats.uniform.pdf(x, loc=0, scale=bins)
@@ -136,18 +129,18 @@ def undersample_dataset(data,
     elif target_distribution == 'triangular':
         target_pdf = stats.triang.pdf(x, c=0.75, loc=0, scale=bins)
 
-    #------------------------------------------------ quantizing data into bins
+    # ------------------------------------------------ quantizing data into bins
     
     if verbose is True:
         print('\nQuantizing dataset...')
     
     data_quantized = np.digitize(data.copy(),
-                                 bins=np.linspace(0,1,bins+1),
+                                 bins=np.linspace(0, 1, bins+1),
                                  right=False)
     data_quantized -= 1
     data_quantized[data_quantized == bins] = bins-1
     
-    #------------------------------------- displaying the initial distributions
+    # ------------------------------------- displaying the initial distributions
     
     if scatterplot_matrix is True:
         plot_scatter_matrix(data,
@@ -159,58 +152,47 @@ def undersample_dataset(data,
                                    ' datapoints)')
                             )
   
-    #-------------------------------------------------------- MILP optimization
+    # -------------------------------------------------------- MILP optimization
 
     if verbose is True:
         print('Filling problem matrices...')
 
-    solver = pywraplp.Solver('SolveIntegerProblem',
-                               pywraplp.Solver.CBC_MIXED_INTEGER_PROGRAMMING)
+    solver = pywraplp.Solver('SolveIntegerProblem', pywraplp.Solver.CBC_MIXED_INTEGER_PROGRAMMING)
     
     solver.set_time_limit(max_solver_time)
     
-    #------- constructing the data for correlation minimization (2nd objective)
+    # ------- constructing the data for correlation minimization (2nd objective)
     
-    #estimating the final distribution in each dimension
-    avg=np.dot(((np.arange(1,bins+1) - 0.5)/bins), target_pdf)
+    # estimating the final distribution in each dimension
+    avg = np.dot(((np.arange(1, bins+1) - 0.5) / bins), target_pdf)
     
-    qq = np.zeros([data_observations, int(comb(data_dimensions,2))],
-                   dtype=float)
+    qq = np.zeros([data_observations, int(comb(data_dimensions, 2))], dtype=float)
     v = np.zeros([data_observations], dtype=float)
     
     for k in range(data_observations):
-        kk=0
-        for i in range(data_dimensions-1):  
-            for j in range(i+1, data_dimensions):
-    
-                qq[k,kk] = np.abs(data[k,i] - avg) * np.abs(data[k,j] - avg)
-    
-                kk=kk+1
-    
-        v[k] = qq[k,:].sum()
+        kk = 0
+        for i in range(data_dimensions - 1):
+            for j in range(i + 1, data_dimensions):
+                qq[k, kk] = np.abs(data[k, i] - avg) * np.abs(data[k, j] - avg)
+                kk = kk+1
+        v[k] = qq[k, :].sum()
 
-    #---------- constructing the data distribution minimization (1st objective)
+    # ---------- constructing the data distribution minimization (1st objective)
     
     # constructing the bin matrix
+    B = []
     
-    B=[]
-    
-    for j in range(data_quantized.shape[1]):  # accross all dimensions
-      
+    for j in range(data_quantized.shape[1]):  # across all dimensions
         b = np.zeros([bins, data_quantized.shape[0]], dtype=bool)
-    
-        for i in range(data_quantized.shape[0]): # accross all observations
-            
-            b[data_quantized[i,j], i] = True
-    
-        B.append(b)   
+        for i in range(data_quantized.shape[0]):  # across all observations
+            b[data_quantized[i, j], i] = True
+        B.append(b)
 
     # Objective function
-    f = lamda*v #2nd objective: minimization of correlation
-    ff = np.ones(data_dimensions*bins, dtype=float) #indexes of slack variables
+    f = lamda * v  # 2nd objective: minimization of correlation
+    ff = np.ones(data_dimensions*bins, dtype=float)  # indexes of slack variables
     c = np.hstack([f, ff])
 
-    
     # creating problem variables
     x = {}
     for i in range(c.shape[0]):
@@ -223,11 +205,9 @@ def undersample_dataset(data,
     
     # define the objective function
     solver.Minimize(solver.Sum([c[i] * x[i] for i in range(c.shape[0])]))
-    
 
     # constraints
-    
-    
+
     # equality constraint: strictly data_to_keep datapoints should be selected
     q = np.hstack([np.ones(data_observations), np.zeros(data_dimensions*bins)])
     solver.Add(solver.Sum(q[j]*x[j] for j in range(len(x))) == data_to_keep)
@@ -238,27 +218,24 @@ def undersample_dataset(data,
         print('Adding constraints [%3d%%]' % 0, end='')
     
     # distribution constraints
-    k=0
-    progress=0
-    for m in range(data_dimensions):   #accross all dimensions
-        
+    k = 0
+    progress = 0
+    for m in range(data_dimensions):  # across all dimensions
         ATR = B[m].astype(dtype=float)
         
-        for n in range(bins):  #across all quantization bins
-    
-            
+        for n in range(bins):  # across all quantization bins
             b = np.ceil(target_pdf[n] * data_to_keep)
     
             a = np.zeros(data_dimensions*bins, dtype=float)
-            z = m * bins + n #2D to 1D
+            z = m * bins + n  # 2D to 1D
             a[z] = -1
     
             # upper slack bound
-            A = np.hstack( [ATR[n,:], a] )
+            A = np.hstack([ATR[n, :], a])
             solver.Add(solver.Sum([A[j]*x[j] for j in range(A.shape[0])]) <= b)
     
             # lower slack bound
-            A = np.hstack( [-ATR[n,:], a] )
+            A = np.hstack([-ATR[n, :], a])
             solver.Add(solver.Sum([A[j]*x[j] for j in range(A.shape[0])]) <= -b)
             
             k += 1
@@ -266,20 +243,17 @@ def undersample_dataset(data,
             
             if verbose is True:
                 print('\b\b\b\b\b\b[%3d%%]' % progress, end='')
-            
-      
+
     if verbose is True:
         print('\nNumber of variables =', solver.NumVariables())
         print('Number of constraints =', solver.NumConstraints())
-    
-    
-    #----------------------------------------------------- solving optimization
-    
+
+    # ----------------------------------------------------- solving optimization
     if verbose is True:
         print('Solving...')
     
     result_status_code = solver.Solve()  # solve problem
-    
+    print(f"Status code: {result_status_code}")
     if verbose is True:
         print('Result status =', result_status[result_status_code])
         print('Total cost = ', solver.Objective().Value())
@@ -294,53 +268,50 @@ def undersample_dataset(data,
         if x[i].solution_value() > 0:
             indx_selected[i] = True
     
-    #spliting vector x into the slack variables and selection variables
+    # spliting vector x into the slack variables and selection variables
     xslack = indx_selected[data_observations:]  # slack variables
     indx_selected = indx_selected[:data_observations]  # selection variables
     indx_selected = indx_selected.astype(bool)
      
-    if indx_selected.sum()>0:
+    if indx_selected.sum() > 0:
         
         if scatterplot_matrix is True:
 
-            plot_scatter_matrix(data[indx_selected,:],
-                                column_names=None,
-                                show_correlation=True,
-                                alpha=None,
-                                title=('Undersampled dataset (' +
-                                       str(indx_selected.sum()) +
-                                       ' datapoints) - ' +
-                                       target_distribution)
-                                )
+            plot_scatter_matrix(
+                data[indx_selected, :],
+                column_names=None,
+                show_correlation=True,
+                alpha=None,
+                title=('Undersampled dataset (' +
+                       str(indx_selected.sum()) +
+                       ' datapoints) - ' +
+                       target_distribution)
+            )
 
-            plot_scatter_matrix(data_quantized[indx_selected,:],
-                                column_names=None,
-                                show_correlation=True,
-                                alpha=None,
-                                title=('Undersampled dataset quantized (' +
-                                       str(indx_selected.sum()) +
-                                       ' datapoints) - ' +
-                                       target_distribution)
-                                )
-
-        
+            plot_scatter_matrix(
+                data_quantized[indx_selected, :],
+                column_names=None,
+                show_correlation=True,
+                alpha=None,
+                title=('Undersampled dataset quantized (' +
+                       str(indx_selected.sum()) +
+                       ' datapoints) - ' +
+                       target_distribution)
+            )
     else:
         if verbose is True:
             print('No solution was found')
-    
-    
     return indx_selected
 
 
-
-
-def plot_scatter_matrix(data,
-                       column_names=None,
-                       show_correlation=True,
-                       alpha=None,
-                       title=None):
-    
-    '''
+def plot_scatter_matrix(
+        data,
+        column_names=None,
+        show_correlation=True,
+        alpha=None,
+        title=None,
+):
+    """
     ---------------------------------------------------------------------------
          Function to plot a customized scatterplot matrix (based on Pandas)
     ---------------------------------------------------------------------------
@@ -370,7 +341,7 @@ def plot_scatter_matrix(data,
     ------
         Plots a customized scatterplot matrix of the input data array.
     
-    '''
+    """
     
     # define names for each dimension
     if column_names is None:
@@ -379,33 +350,23 @@ def plot_scatter_matrix(data,
     # auto set of alpha according to dataset size in the interval [0.1,0.7]
     if alpha is None:   
         alpha = (5000 - data.shape[0]) / 5000
-        if alpha > 0.7: alpha = 0.7
-        elif alpha < 0.1: alpha = 0.1
+        if alpha > 0.7:
+            alpha = 0.7
+        elif alpha < 0.1:
+            alpha = 0.1
         
     # create a dataframe and plot the basic scatterplot matrix
     df_A = pd.DataFrame(data, columns=column_names)
-    axes = pd.plotting.scatter_matrix(df_A,
-                                      alpha=alpha,
-                                      figsize=(8, 8),
-                                      diagonal='hist')
+    axes = pd.plotting.scatter_matrix(df_A, alpha=alpha, figsize=(8, 8), diagonal='hist')
     
     # plot Pearson correlation coefficient for pairs of dimensions
     if show_correlation is True:
         corr = df_A.corr().to_numpy()
         for i, j in zip(*plt.np.triu_indices_from(axes, k=1)):
-            axes[i, j].annotate("r=%.3f" %corr[i,j], 
-                (0.7, 0.9), 
-                xycoords='axes fraction', 
-                ha='center', 
-                va='center')
+            axes[i, j].annotate("r=%.3f" % corr[i, j], (0.7, 0.9), xycoords='axes fraction', ha='center', va='center')
     
     # add title     
     if title is not None:        
         plt.suptitle(title)
         
     plt.show()
-
-
-
-    
-    
